@@ -19,10 +19,10 @@ def capture_background(frame):
 
 def process_frame(frame, background):
     if frame is None:
-        return None, None
+        return None
 
     if background is None:
-        return frame, frame
+        return frame
 
     live_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
@@ -36,7 +36,7 @@ def process_frame(frame, background):
 
     result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
 
-    return result_rgb, frame
+    return result_rgb
 
 
 with gr.Blocks(title="VisionCloak AI Human Invisibility") as demo:
