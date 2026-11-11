@@ -1,4 +1,4 @@
-
+"""Gradio webcam app for VisionCloak."""
 import os
 import cv2
 import gradio as gr
@@ -11,69 +11,90 @@ segmenter = HumanSegmenter(model_selection=1)
 
 def capture_background(frame):
     if frame is None:
-        return None, "No webcam frame received. Please wait."
+        return None, "No webcam frame received. Click Record on the webcam and wait for the live preview before capturing."
 
     background = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    return background, "Empty background captured successfully!"
+    return background, "Empty background captured. Now enter the camera view."
 
 
 def process_frame(frame, background):
     if frame is None:
-        return None
+        return None, None
+
+    # Keep the most recent browser webcam frame in Gradio state.
+    latest_frame = frame.copy()
 
     if background is None:
-        return frame
+        return frame, latest_frame
 
     live_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-    mask = segmenter.get_mask(live_bgr, threshold=0.65)
-
-    result = apply_invisibility_effect(
-        live_bgr,
-        background,
-        mask
+    human_mask = segmenter.get_mask(live_bgr, threshold=0.65)
+    result_bgr = apply_invisibility_effect(
+        live_bgr, background, human_mask
     )
+    result_rgb = cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
+    return result_rgb, latest_frame
 
-    result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
 
-    return result_rgb
+def capture_from_latest_frame(frame):
+    return capture_background(frame)
+
+
+def reset_background():
+    return None, "Background reset. Keep the scene empty and capture again."
 
 
 with gr.Blocks(title="VisionCloak AI Human Invisibility") as demo:
-
     gr.Markdown("# VisionCloak – AI Human Invisibility")
     gr.Markdown(
-        "1. Keep the camera view empty.\n"
-        "2. Capture the empty background.\n"
-        "3. Enter the camera view to test invisibility."
+        "1. Allow browser webcam access and click **Record** on the webcam.\n"
+        "2. Wait until the live preview appears. Keep the scene empty.\n"
+        "3. Click **Capture Empty Background**.\n"
+        "4. Enter the camera view. Keep the camera still and lighting steady."
     )
 
-    background_state = gr.State(None)
+    background_state = gr.State(value=None)
+    latest_frame_state = gr.State(value=None)
 
     camera = gr.Image(
         sources=["webcam"],
         type="numpy",
         streaming=True,
-        label="Webcam"
+        label="Webcam – click Record to start"
     )
 
-    capture_button = gr.Button("Capture Empty Background")
-    status = gr.Textbox(label="Status")
-    output = gr.Image(label="Invisibility Result")
+    with gr.Row():
+        capture_button = gr.Button(
+            "Capture Empty Background", variant="primary"
+        )
+        reset_button = gr.Button("Reset Background")
+
+    status = gr.Textbox(
+        label="Status",
+        value="Allow webcam access, click Record, and wait for a live frame.",
+        interactive=False
+    )
+    output = gr.Image(label="VisionCloak Result")
 
     capture_button.click(
-        capture_background,
-        inputs=camera,
+        fn=capture_from_latest_frame,
+        inputs=latest_frame_state,
+        outputs=[background_state, status]
+    )
+
+    reset_button.click(
+        fn=reset_background,
+        inputs=None,
         outputs=[background_state, status]
     )
 
     camera.stream(
-        process_frame,
+        fn=process_frame,
         inputs=[camera, background_state],
-        outputs=output,
-        stream_every=0.2
+        outputs=[output, latest_frame_state],
+        stream_every=0.2,
+        concurrency_limit=1
     )
-
 
 demo.launch(
     server_name="0.0.0.0",
