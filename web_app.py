@@ -11,18 +11,18 @@ segmenter = HumanSegmenter(model_selection=1)
 
 def capture_background(frame):
     if frame is None:
-        return None, "Please enable your webcam first."
+        return None, "No webcam frame received. Please wait."
 
     background = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    return background, "Background captured successfully!"
+    return background, "Empty background captured successfully!"
 
 
 def process_frame(frame, background):
     if frame is None:
-        return None
+        return None, None
 
     if background is None:
-        return frame
+        return frame, frame
 
     live_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
@@ -34,15 +34,22 @@ def process_frame(frame, background):
         mask
     )
 
-    return cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+    result_rgb = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+
+    return result_rgb, frame
 
 
 with gr.Blocks(title="VisionCloak AI Human Invisibility") as demo:
 
     gr.Markdown("# VisionCloak – AI Human Invisibility")
-    gr.Markdown("Capture an empty background before entering the camera view.")
+    gr.Markdown(
+        "1. Keep the camera view empty.\n"
+        "2. Capture the empty background.\n"
+        "3. Enter the camera view to test invisibility."
+    )
 
     background_state = gr.State(None)
+    latest_frame = gr.State(None)
 
     camera = gr.Image(
         sources=["webcam"],
@@ -57,14 +64,14 @@ with gr.Blocks(title="VisionCloak AI Human Invisibility") as demo:
 
     capture_button.click(
         capture_background,
-        inputs=camera,
+        inputs=latest_frame,
         outputs=[background_state, status]
     )
 
     camera.stream(
         process_frame,
         inputs=[camera, background_state],
-        outputs=output,
+        outputs=[output, latest_frame],
         stream_every=0.2
     )
 
