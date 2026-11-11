@@ -79,8 +79,8 @@ def apply_invisibility_effect(live_frame, background_frame, human_mask):
 
     # Require a meaningful brightness reduction
     dark_threshold = np.maximum(
-        10.0,
-        background_brightness * 0.06
+        7.0,
+        background_brightness * 0.045
     )
 
     darker_pixels = brightness_drop > dark_threshold
@@ -96,12 +96,12 @@ def apply_invisibility_effect(live_frame, background_frame, human_mask):
         (background_lab[:, :, 2] - live_lab[:, :, 2]) ** 2
     )
 
-    similar_colour = colour_difference < 18.0
+    similar_colour = colour_difference < 28.0
 
     # Limit shadow detection to the area around the detected person.
     # This helps avoid replacing unrelated dark objects elsewhere in the scene.
     nearby_person_kernel = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE, (181, 181)
+        cv2.MORPH_ELLIPSE, (301, 301)
     )
     nearby_person_area = cv2.dilate(
         person_mask, nearby_person_kernel, iterations=1
