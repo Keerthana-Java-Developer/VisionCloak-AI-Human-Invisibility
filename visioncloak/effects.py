@@ -1,99 +1,112 @@
 
-"""Advanced Human and Shadow Removal."""
+"""Human and cast-shadow removal using OpenCV."""
+
 import cv2
 import numpy as np
 
 
-def apply_invisibility_effect(
-    live_frame,
-    background_frame,
-    human_mask
-):
+def apply_invisibility_effect(live_frame, background_frame, human_mask):
+    if live_frame is None or background_frame is None:
+        raise ValueError("Live frame and background frame are required")
 
     height, width = live_frame.shape[:2]
 
-    if background_frame.shape[:2] != (height, width):
-        background_frame = cv2.resize(
-            background_frame, (width, height)
-        )
-
-    if human_mask.shape[:2] != (height, width):
-        human_mask = cv2.resize(
-            human_mask.astype(np.float32),
-            (width, height)
-        )
-
-    # STEP 1: Detect the complete human region
-    mask = np.clip(human_mask, 0, 1)
-
-    binary_mask = (mask > 0.16).astype(np.uint8)
-
-    # STEP 2: Fill small gaps
-    kernel = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE, (21, 21)
+    # Match the captured background to the webcam dimensions
+    background = cv2.resize(
+        background_frame, (width, height)
     )
 
-    binary_mask = cv2.morphologyEx(
-        binary_mask,
+    # --------------------------------------------------
+    # STEP 1: Prepare the MediaPipe human mask
+    # --------------------------------------------------
+    if human_mask is None:
+        person_mask = np.zeros((height, width), dtype=np.uint8)
+    else:
+        mask = np.asarray(human_mask, dtype=np.float32)
+
+        if mask.ndim == 3:
+            mask = cv2.cvtColor(
+                mask, cv2.COLOR_BGR2GRAY
+            )
+
+        mask = cv2.resize(mask, (width, height))
+
+        if mask.max() > 1.0:
+            mask = mask / 255.0
+
+        person_mask = (mask > 0.35).astype(np.uint8)
+
+    # Fill holes in the person mask
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE, (15, 15)
+    )
+
+    person_mask = cv2.morphologyEx(
+        person_mask,
         cv2.MORPH_CLOSE,
         kernel,
         iterations=2
     )
 
-    locations = cv2.findNonZero(binary_mask)
-
-    if locations is None:
-        return live_frame.copy()
-
-    x, y, w, h = cv2.boundingRect(locations)
-
-    # STEP 3: Expand human boundary
-    expand = max(35, int(min(width, height) * 0.045))
-    if expand % 2 == 0:
-        expand += 1
-
-    human_kernel = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE, (expand, expand)
+    # Expand mask to cover the person's outline
+    person_mask = cv2.dilate(
+        person_mask,
+        cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE, (31, 31)
+        ),
+        iterations=1
     )
 
-    expanded_mask = cv2.dilate(
-        binary_mask,
-        human_kernel,
-        iterations=2
+    # --------------------------------------------------
+    # STEP 2: Detect shadows independently of MediaPipe
+    # --------------------------------------------------
+    live_lab = cv2.cvtColor(
+        live_frame, cv2.COLOR_BGR2LAB
+    ).astype(np.float32)
+
+    background_lab = cv2.cvtColor(
+        background, cv2.COLOR_BGR2LAB
+    ).astype(np.float32)
+
+    # LAB channel 0 represents brightness
+    live_brightness = live_lab[:, :, 0]
+    background_brightness = background_lab[:, :, 0]
+
+    # Shadows make the current image darker
+    brightness_drop = (
+        background_brightness - live_brightness
     )
 
-    # STEP 4: Detect nearby dark shadows
-    pad_x = int(w * 0.50)
-    pad_top = int(h * 0.15)
-    pad_bottom = int(h * 0.40)
-
-    x1 = max(0, x - pad_x)
-    x2 = min(width, x + w + pad_x)
-    y1 = max(0, y - pad_top)
-    y2 = min(height, y + h + pad_bottom)
-
-    live_gray = cv2.cvtColor(
-        live_frame, cv2.COLOR_BGR2GRAY
-    ).astype(np.int16)
-
-    bg_gray = cv2.cvtColor(
-        background_frame, cv2.COLOR_BGR2GRAY
-    ).astype(np.int16)
-
-    difference = bg_gray - live_gray
-
-    shadow_mask = np.zeros(
-        (height, width), dtype=np.uint8
+    # Require a meaningful brightness reduction
+    dark_threshold = np.maximum(
+        10.0,
+        background_brightness * 0.06
     )
 
-    roi = difference[y1:y2, x1:x2]
+    darker_pixels = brightness_drop > dark_threshold
 
-    shadow_mask[y1:y2, x1:x2] = (
-        roi > 10
+    # --------------------------------------------------
+    # STEP 3: Check colour similarity
+    # Shadows normally change brightness more than colour.
+    # LAB channels 1 and 2 represent colour information.
+    # --------------------------------------------------
+    colour_difference = np.sqrt(
+        (background_lab[:, :, 1] - live_lab[:, :, 1]) ** 2
+        +
+        (background_lab[:, :, 2] - live_lab[:, :, 2]) ** 2
+    )
+
+    similar_colour = colour_difference < 18.0
+
+    shadow_mask = (
+        darker_pixels & similar_colour
     ).astype(np.uint8)
 
+    # --------------------------------------------------
+    # STEP 4: Clean the shadow mask
+    # --------------------------------------------------
     shadow_kernel = cv2.getStructuringElement(
-        cv2.MORPH_ELLIPSE, (15, 15)
+        cv2.MORPH_ELLIPSE, (7, 7)
     )
 
     shadow_mask = cv2.morphologyEx(
@@ -103,40 +116,53 @@ def apply_invisibility_effect(
         iterations=2
     )
 
-    shadow_mask = cv2.dilate(
+    shadow_mask = cv2.morphologyEx(
         shadow_mask,
+        cv2.MORPH_OPEN,
         shadow_kernel,
         iterations=1
     )
 
-    # STEP 5: Combine human and shadow
+    # --------------------------------------------------
+    # STEP 5: Combine person and shadow masks
+    # --------------------------------------------------
     final_mask = cv2.bitwise_or(
-        expanded_mask,
-        shadow_mask
+        person_mask, shadow_mask
     )
 
-    # STEP 6: Smooth the outer boundary
+    # Remove tiny gaps in the combined mask
+    final_mask = cv2.morphologyEx(
+        final_mask,
+        cv2.MORPH_CLOSE,
+        kernel,
+        iterations=1
+    )
+
+    # --------------------------------------------------
+    # STEP 6: Smooth replacement boundaries
+    # --------------------------------------------------
     alpha = cv2.GaussianBlur(
         final_mask.astype(np.float32),
         (0, 0),
-        sigmaX=2.0
+        sigmaX=1.5
     )
 
-    alpha = np.clip(alpha, 0, 1)
+    alpha = np.clip(alpha, 0.0, 1.0)
     alpha = alpha[:, :, np.newaxis]
 
-    # STEP 7: Replace with original clean background
+    # --------------------------------------------------
+    # STEP 7: Replace detected regions with clean background
+    # --------------------------------------------------
     result = (
-        live_frame.astype(np.float32) * (1 - alpha)
+        live_frame.astype(np.float32) * (1.0 - alpha)
         +
-        background_frame.astype(np.float32) * alpha
+        background.astype(np.float32) * alpha
     )
 
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
 def add_status_panel(frame, lines, panel_height=112):
-
     output = frame.copy()
     overlay = output.copy()
 
@@ -155,7 +181,6 @@ def add_status_panel(frame, lines, panel_height=112):
     y = 30
 
     for index, line in enumerate(lines):
-
         scale = 0.68 if index == 0 else 0.52
         thickness = 2 if index == 0 else 1
 
