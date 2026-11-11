@@ -49,7 +49,6 @@ with gr.Blocks(title="VisionCloak AI Human Invisibility") as demo:
     )
 
     background_state = gr.State(None)
-    latest_frame = gr.State(None)
 
     camera = gr.Image(
         sources=["webcam"],
@@ -64,14 +63,14 @@ with gr.Blocks(title="VisionCloak AI Human Invisibility") as demo:
 
     capture_button.click(
         capture_background,
-        inputs=latest_frame,
+        inputs=camera,
         outputs=[background_state, status]
     )
 
     camera.stream(
         process_frame,
         inputs=[camera, background_state],
-        outputs=[output, latest_frame],
+        outputs=output,
         stream_every=0.2
     )
 
