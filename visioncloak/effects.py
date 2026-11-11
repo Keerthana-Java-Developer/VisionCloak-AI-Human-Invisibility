@@ -98,8 +98,19 @@ def apply_invisibility_effect(live_frame, background_frame, human_mask):
 
     similar_colour = colour_difference < 18.0
 
+    # Limit shadow detection to the area around the detected person.
+    # This helps avoid replacing unrelated dark objects elsewhere in the scene.
+    nearby_person_kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE, (181, 181)
+    )
+    nearby_person_area = cv2.dilate(
+        person_mask, nearby_person_kernel, iterations=1
+    )
+
     shadow_mask = (
-        darker_pixels & similar_colour
+        darker_pixels
+        & similar_colour
+        & (nearby_person_area > 0)
     ).astype(np.uint8)
 
     # --------------------------------------------------
