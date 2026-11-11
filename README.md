@@ -1,92 +1,69 @@
 # VisionCloak — AI-Powered Human Invisibility
 
-A real-time computer-vision demonstration that detects a person in a webcam stream and replaces the segmented person region with a clean background frame captured earlier.
+<p align="center">
+  <strong>A real-time computer-vision project using Python, OpenCV and MediaPipe.</strong>
+  <br />
+  Detect a person in a webcam stream and replace the segmented region with a clean background frame captured earlier.
+</p>
 
-**Important:** This is a software visual effect, not physical invisibility. It works best with a fixed camera, stable lighting, and a background captured while nobody is in the scene.
+<p align="center">
+  <a href="https://visioncloak-ai-human-invisibility.onrender.com">Live Demo</a> ·
+  <a href="https://github.com/keerthanavinoth2003-maker/VisionCloak-AI-Human-Invisibility">Source Code</a>
+</p>
 
-## Project highlights
+> **Project note:** This is an experimental visual effect, not physical invisibility. Results depend on a fixed camera, stable lighting, and a clean background captured before the person enters the scene. Shadow removal is experimental and may not work perfectly in every environment.
 
-- Real-time webcam video processing with OpenCV
-- Human segmentation using MediaPipe Selfie Segmentation
-- Soft mask refinement to reduce noisy edges
-- Background compositing for the invisibility effect
-- Background capture and reset controls
-- Snapshot and MP4 recording support
+## Features
+
+- Real-time webcam processing with OpenCV
+- Human segmentation with MediaPipe Selfie Segmentation
+- Mask cleanup and softened compositing edges
+- Background capture, reset, and replacement
+- Snapshot saving and MP4 recording
 - Configurable camera index, resolution, and segmentation threshold
-- Modular code structure and a small unit test
+- Separate modules for application logic, configuration, segmentation, and effects
+- A basic automated test for the compositing function
+- Browser-based webcam demo powered by Gradio
+
+## Live demo
+
+**[Open VisionCloak on Render](https://visioncloak-ai-human-invisibility.onrender.com)**
+
+The browser demo needs webcam permission. Start the webcam preview, capture the empty scene, and then enter the frame. The hosted service may take a short time to wake up.
+
+## How it works
+
+1. OpenCV captures frames from the webcam.
+2. MediaPipe Selfie Segmentation estimates which pixels belong to a person.
+3. The application cleans and expands the mask to cover the detected person.
+4. The detected region is blended with the previously captured empty-scene background.
+5. OpenCV or Gradio displays the processed frame.
 
 ## Demo workflow
 
-1. Place the webcam or laptop on a stable surface.
-2. Keep the camera view empty and press **B** to capture the clean background.
+1. Keep the camera still and make sure the scene is empty.
+2. Capture the clean background.
 3. Enter the camera view.
-4. Press **I** to enable the invisibility effect.
-5. Press **I** again to disable it.
+4. Enable the invisibility effect.
+5. Reset and capture again if the camera position or lighting changes.
 
-The captured background is saved to `output/captured_background.jpg`.
+## Tech stack
 
-## Requirements
-
-- Windows 10/11, macOS, or Linux
-- Python 3.10 or 3.11, 64-bit recommended
-- A working webcam
-- Internet connection for the first dependency installation
-
-Python 3.12+ may require different package versions. Use Python 3.11 for the most predictable setup with the pinned dependencies.
-
-## Installation (Windows)
-
-Open Command Prompt in the extracted `VisionCloak_AI_Human_Invisibility` folder.
-
-```bash
-py -3.11 -m venv .venv
-.venv\Scripts\activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-python main.py
-```
-
-You can also double-click `run_windows.bat`. It installs the listed dependencies and starts the app using the `python` command available on your PATH.
-
-## Installation (macOS / Linux)
-
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-python main.py
-```
-
-## Controls
-
-| Key | Action |
+| Technology | Purpose |
 |---|---|
-| `B` | Capture the current frame as the clean background. The scene must be empty. |
-| `I` | Turn the invisibility effect on/off. Capture a background first. |
-| `R` | Reset the captured background and turn the effect off. |
-| `S` | Save a snapshot in the `output/` folder. |
-| `V` | Start/stop MP4 recording in the `output/` folder. |
-| `Q` | Quit safely. |
-
-## Run options
-
-```bash
-python main.py --camera 0 --width 1280 --height 720 --threshold 0.65
-```
-
-- `--camera`: webcam index; try `1` if the default camera does not open.
-- `--width`, `--height`: requested camera resolution.
-- `--threshold`: segmentation confidence threshold from `0.0` to `1.0`. Increase it to reduce false detections; decrease it if parts of the person are missed.
-- `--no-mirror`: show the camera without horizontal mirroring.
-- `--output-dir`: choose another folder for snapshots and recordings.
-- `--debug`: print detailed logs.
+| Python | Application logic |
+| OpenCV | Webcam capture, image processing, and display |
+| MediaPipe | Human segmentation |
+| NumPy | Mask operations and image compositing |
+| Gradio | Browser-based webcam interface |
+| pytest | Basic automated testing |
 
 ## Project structure
 
 ```text
-VisionCloak_AI_Human_Invisibility/
+VisionCloak-AI-Human-Invisibility/
 ├── main.py
+├── web_app.py
 ├── requirements.txt
 ├── run_windows.bat
 ├── README.md
@@ -102,46 +79,103 @@ VisionCloak_AI_Human_Invisibility/
 └── output/
 ```
 
-## How it works
+## Run locally
 
-1. OpenCV reads frames from the webcam.
-2. MediaPipe Selfie Segmentation estimates a per-pixel human confidence mask.
-3. The mask is cleaned with morphological operations and softened with Gaussian blur.
-4. The application blends the live frame with the previously captured clean background:
-   - Human mask: use the clean background.
-   - Background mask: use the current live frame.
-5. OpenCV displays the resulting frame in real time.
+### Requirements
 
-## Limitations and ways to improve the demo
+- Python 3.10 or 3.11 (64-bit recommended)
+- A webcam
+- Windows, macOS, or Linux
 
-- **Camera movement:** Moving the camera shifts the scene, so the saved background no longer aligns. Use a tripod or fixed laptop.
-- **Changing background objects:** Objects that move after background capture will not be reconstructed correctly behind the person.
-- **Lighting changes:** Large lighting changes can make the replacement visible.
-- **Segmentation edges:** Loose hair, fast movement, and similar-coloured clothing/backgrounds can affect the mask.
-- **Performance:** Real-time speed depends on CPU/GPU, camera resolution, and system load.
+### Windows PowerShell
 
-Potential future improvements include temporal mask smoothing, background alignment, person detection with a modern segmentation model, a polished desktop UI, and performance benchmarking.
+Run these commands from the repository root:
 
-## Testing
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python main.py
+```
+
+If PowerShell blocks virtual-environment activation, you can use Command Prompt and run:
+
+```bat
+.venv\Scripts\activate.bat
+```
+
+### macOS / Linux
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python main.py
+```
+
+### Run the browser app locally
+
+```bash
+python web_app.py
+```
+
+Then open the local Gradio URL printed in the terminal and allow webcam access.
+
+## Desktop keyboard controls
+
+| Key | Action |
+|---|---|
+| `B` | Capture the empty background |
+| `I` | Toggle the invisibility effect |
+| `R` | Reset the captured background |
+| `S` | Save a snapshot in `output/` |
+| `V` | Start or stop MP4 recording |
+| `Q` | Quit the application |
+
+### Optional settings
+
+```bash
+python main.py --camera 0 --width 1280 --height 720 --threshold 0.65
+```
+
+- `--camera`: webcam device index; try `1` if camera `0` is unavailable.
+- `--width` and `--height`: requested camera resolution.
+- `--threshold`: segmentation confidence threshold between `0.0` and `1.0`.
+- `--no-mirror`: disable the mirrored preview.
+- `--output-dir`: choose another output folder.
+- `--debug`: enable detailed logs.
+
+## Run tests
 
 ```bash
 pytest -q
 ```
 
-The unit test checks that the compositing function replaces masked pixels with the captured background while preserving unmasked pixels.
+## Known limitations
 
-## Interview explanation
+- Camera movement causes the captured background to become misaligned.
+- Lighting changes can make the replacement region visible.
+- Moving objects in the background are not reconstructed.
+- Hair, fast movement, and similar clothing/background colours can reduce segmentation quality.
+- Cast-shadow removal is experimental; some shadows may remain or other dark regions may be mistakenly selected.
+- Performance depends on the computer, webcam resolution, and available processing power.
 
-**Problem:** A webcam feed normally shows a person in front of the camera. This project creates an invisibility-style visual effect by replacing the detected person region with a clean frame of the empty scene.
+For best results, use a fixed camera, even front lighting, and capture the background with nobody in the scene.
 
-**Approach:** I used MediaPipe Selfie Segmentation to generate a human mask, OpenCV to capture and process webcam frames, and NumPy alpha blending to composite the clean background into the human region.
+## Future improvements
 
-**Key engineering decision:** The background is captured before the person enters. This avoids trying to invent unseen pixels and makes the effect understandable and reproducible.
+- Temporal mask smoothing to reduce flicker
+- Better background alignment and shadow estimation
+- Performance profiling and FPS display
+- More comprehensive automated tests
+- Improved browser UI and clearer setup diagnostics
 
-**Evaluation ideas:** Measure average FPS, test segmentation quality under different lighting and clothing conditions, and compare the effect at different confidence thresholds.
+## What I learned
 
-**Honest description:** This is a real-time computer-vision prototype. It does not make a person physically invisible and does not guarantee perfect results in every environment.
+This project explores real-time computer vision, human segmentation, image masks, morphological operations, alpha blending, webcam streaming, and deployment of a Python web application.
 
 ## License
 
-MIT License. See `LICENSE`.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
